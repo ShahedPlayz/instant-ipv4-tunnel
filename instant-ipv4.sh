@@ -1,5 +1,3 @@
-all good
-
 #!/bin/bash
 
 # Colors
@@ -206,10 +204,11 @@ show_method_data() {
     
     if [ "$method" = "bot" ]; then
         echo -e "${BLUE}Discord ID:${NC} $(echo "$data" | jq -r '.user_id // "Not set"')"
+        echo -e "${BLUE}Bot Port:${NC} $(echo "$data" | jq -r '.port_bot // "Not set"')"
     else
         echo -e "${BLUE}Webhook:${NC} $(echo "$data" | jq -r '.webhook // "Not set"')"
+        echo -e "${BLUE}Webhook Port:${NC} $(echo "$data" | jq -r '.port_webhook // "Not set"')"
     fi
-    echo -e "${BLUE}Port:${NC} $(echo "$data" | jq -r '.port // "Not set"')"
     
     if is_tunnel_running "$p" "$method"; then
         echo -e "\n${GREEN}✅ ${method^} Tunnel Running${NC}"
@@ -236,11 +235,12 @@ status_all() {
     if [ -z "$profiles" ]; then
         echo -e "${RED}No profiles found!${NC}"
     else
-        printf "${PURPLE}%-20s %-8s %-12s %-12s %-10s${NC}\n" "Profile" "Port" "Bot" "Webhook" "Status"
-        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        printf "${PURPLE}%-15s %-10s %-10s %-12s %-12s %-10s${NC}\n" "Profile" "Bot Port" "Web Port" "Bot" "Webhook" "Status"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         
         while IFS= read -r p; do
-            local port=$(echo "$db" | jq -r ".profiles.\"$p\".port // \"-\"")
+            local port_bot=$(echo "$db" | jq -r ".profiles.\"$p\".port_bot // \"-\"")
+            local port_webhook=$(echo "$db" | jq -r ".profiles.\"$p\".port_webhook // \"-\"")
             local has_bot=$(echo "$db" | jq -r ".profiles.\"$p\".user_id // \"null\"")
             local has_webhook=$(echo "$db" | jq -r ".profiles.\"$p\".webhook // \"null\"")
             
@@ -264,8 +264,9 @@ status_all() {
             local overall="Idle"
             is_tunnel_running "$p" "bot" || is_tunnel_running "$p" "webhook" && overall="🟢 Active"
             
-            echo -ne "${CYAN}$(printf '%-20s' "$p")${NC} "
-            echo -ne "$(printf '%-8s' "$port") "
+            echo -ne "${CYAN}$(printf '%-15s' "$p")${NC} "
+            echo -ne "$(printf '%-10s' "$port_bot") "
+            echo -ne "$(printf '%-10s' "$port_webhook") "
             echo -ne "$(printf '%-12s' "$bot_display") "
             echo -ne "$(printf '%-12s' "$webhook_display") "
             echo -e "$overall"
@@ -296,7 +297,8 @@ restart_all() {
     fi
     
     while IFS= read -r p; do
-        local port=$(echo "$db" | jq -r ".profiles.\"$p\".port")
+        local port_bot=$(echo "$db" | jq -r ".profiles.\"$p\".port_bot")
+        local port_webhook=$(echo "$db" | jq -r ".profiles.\"$p\".port_webhook")
         local user_id=$(echo "$db" | jq -r ".profiles.\"$p\".user_id")
         local webhook=$(echo "$db" | jq -r ".profiles.\"$p\".webhook")
         
@@ -305,20 +307,18 @@ restart_all() {
         
         sleep 1
         
-        if [ "$user_id" != "null" ] && [ "$port" != "null" ] && [ -n "$port" ]; then
+        if [ "$user_id" != "null" ] && [ "$port_bot" != "null" ] && [ -n "$port_bot" ]; then
             echo -e "${GREEN}🔄 Restarting Bot tunnel for: ${CYAN}$p${NC}"
-            start_tunnel_tmux "$p" "$port" "bot" "$user_id" "" > /dev/null 2>&1
+            start_tunnel_tmux "$p" "$port_bot" "bot" "$user_id" "" > /dev/null 2>&1
         fi
         
-        if [ "$webhook" != "null" ] && [ "$port" != "null" ] && [ -n "$port" ]; then
+        if [ "$webhook" != "null" ] && [ "$port_webhook" != "null" ] && [ -n "$port_webhook" ]; then
             echo -e "${GREEN}🔄 Restarting Webhook tunnel for: ${CYAN}$p${NC}"
-            start_tunnel_tmux "$p" "$port" "webhook" "" "$webhook" > /dev/null 2>&1
+            start_tunnel_tmux "$p" "$port_webhook" "webhook" "" "$webhook" > /dev/null 2>&1
         fi
         
         if [ "$user_id" = "null" ] && [ "$webhook" = "null" ]; then
             echo -e "${YELLOW}⏭️  Skipping ${CYAN}$p${NC} - No method configured"
-        elif [ "$port" = "null" ] || [ -z "$port" ]; then
-            echo -e "${YELLOW}⏭️  Skipping ${CYAN}$p${NC} - No port set"
         fi
     done <<< "$profiles"
     
@@ -398,7 +398,7 @@ create_profile() {
         echo -e "\n${RED}Profile already exists!${NC}"; sleep 2; return
     fi
     
-    db=$(echo "$db" | jq ".profiles.\"$profile_name\" = {\"user_id\":null,\"webhook\":null,\"port\":null}")
+    db=$(echo "$db" | jq ".profiles.\"$profile_name\" = {\"user_id\":null,\"webhook\":null,\"port_bot\":null,\"port_webhook\":null}")
     save_db "$db"
     
     echo -e "\n${GREEN}✅ Profile created!${NC}"; sleep 1
@@ -540,8 +540,8 @@ bot_method() {
         case $choice in
             1) set_discord_id "$p" ;;
             2) set_discord_id "$p" ;;
-            3) set_port "$p" ;;
-            4) set_port "$p" ;;
+            3) set_port "$p" "bot" ;;
+            4) set_port "$p" "bot" ;;
             5) show_method_data "$p" "bot" ;;
             6)
                 if is_tunnel_running "$p" "bot"; then
@@ -554,7 +554,7 @@ bot_method() {
             8)
                 echo -ne "\n${RED}Clear bot data? (y/n): ${NC}"
                 read -r confirm
-                [ "$confirm" = "y" ] && { local db=$(load_db); db=$(echo "$db" | jq ".profiles.\"$p\".user_id = null"); save_db "$db"; echo -e "\n${GREEN}✅ Cleared!${NC}"; }
+                [ "$confirm" = "y" ] && { local db=$(load_db); db=$(echo "$db" | jq ".profiles.\"$p\".user_id = null | .profiles.\"$p\".port_bot = null"); save_db "$db"; echo -e "\n${GREEN}✅ Cleared!${NC}"; }
                 sleep 1
                 ;;
             9) return ;;
@@ -588,8 +588,8 @@ webhook_method() {
         case $choice in
             1) set_webhook "$p" ;;
             2) set_webhook "$p" ;;
-            3) set_port "$p" ;;
-            4) set_port "$p" ;;
+            3) set_port "$p" "webhook" ;;
+            4) set_port "$p" "webhook" ;;
             5) show_method_data "$p" "webhook" ;;
             6)
                 if is_tunnel_running "$p" "webhook"; then
@@ -602,7 +602,7 @@ webhook_method() {
             8)
                 echo -ne "\n${RED}Clear webhook data? (y/n): ${NC}"
                 read -r confirm
-                [ "$confirm" = "y" ] && { local db=$(load_db); db=$(echo "$db" | jq ".profiles.\"$p\".webhook = null"); save_db "$db"; echo -e "\n${GREEN}✅ Cleared!${NC}"; }
+                [ "$confirm" = "y" ] && { local db=$(load_db); db=$(echo "$db" | jq ".profiles.\"$p\".webhook = null | .profiles.\"$p\".port_webhook = null"); save_db "$db"; echo -e "\n${GREEN}✅ Cleared!${NC}"; }
                 sleep 1
                 ;;
             9) return ;;
@@ -616,7 +616,7 @@ start_bot_tunnel() {
     local p="$1"
     local db=$(load_db)
     local user_id=$(echo "$db" | jq -r ".profiles.\"$p\".user_id")
-    local port=$(echo "$db" | jq -r ".profiles.\"$p\".port")
+    local port=$(echo "$db" | jq -r ".profiles.\"$p\".port_bot")
     
     if [ "$user_id" = "null" ] || [ "$port" = "null" ]; then
         echo -e "\n${RED}❌ Set Discord ID and Port first!${NC}"; sleep 2; return
@@ -629,7 +629,7 @@ start_webhook_tunnel() {
     local p="$1"
     local db=$(load_db)
     local webhook=$(echo "$db" | jq -r ".profiles.\"$p\".webhook")
-    local port=$(echo "$db" | jq -r ".profiles.\"$p\".port")
+    local port=$(echo "$db" | jq -r ".profiles.\"$p\".port_webhook")
     
     if [ "$webhook" = "null" ] || [ "$port" = "null" ]; then
         echo -e "\n${RED}❌ Set Webhook and Port first!${NC}"; sleep 2; return
@@ -652,14 +652,15 @@ set_discord_id() {
 }
 
 set_port() {
+    local p="$1" method="$2"
     banner
-    echo -e "${YELLOW}Set Port${NC}\n"
+    echo -e "${YELLOW}Set Port for ${method^} Method${NC}\n"
     echo -ne "${BLUE}Enter port: ${NC}"
     read -r port
     [[ ! "$port" =~ ^[0-9]+$ ]] && { echo -e "\n${RED}Invalid!${NC}"; sleep 2; return; }
-    echo -ne "\n${YELLOW}Forward port ${CYAN}$port${YELLOW}? (y/n): ${NC}"
+    echo -ne "\n${YELLOW}Forward port ${CYAN}$port${YELLOW} for ${method}? (y/n): ${NC}"
     read -r confirm
-    [ "$confirm" = "y" ] && { local db=$(load_db); db=$(echo "$db" | jq ".profiles.\"$1\".port = \"$port\""); save_db "$db"; echo -e "\n${GREEN}✅ Saved!${NC}"; }
+    [ "$confirm" = "y" ] && { local db=$(load_db); db=$(echo "$db" | jq ".profiles.\"$p\".port_${method} = \"$port\""); save_db "$db"; echo -e "\n${GREEN}✅ Saved!${NC}"; }
     sleep 1
 }
 
