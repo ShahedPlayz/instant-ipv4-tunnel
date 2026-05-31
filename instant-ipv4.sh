@@ -193,7 +193,37 @@ is_tunnel_running() {
     tmux has-session -t "sgm_${profile_name}_${method}" 2>/dev/null
 }
 
-# ---------- NEW: Status All ----------
+# ---------- Show Method Data ----------
+show_method_data() {
+    local p="$1" method="$2"
+    banner
+    echo -e "${YELLOW}${method^} Method Data: ${CYAN}$p${NC}\n"
+    
+    local db=$(load_db)
+    local data=$(echo "$db" | jq ".profiles.\"$p\"")
+    
+    if [ "$method" = "bot" ]; then
+        echo -e "${BLUE}Discord ID:${NC} $(echo "$data" | jq -r '.user_id // "Not set"')"
+    else
+        echo -e "${BLUE}Webhook:${NC} $(echo "$data" | jq -r '.webhook // "Not set"')"
+    fi
+    echo -e "${BLUE}Port:${NC} $(echo "$data" | jq -r '.port // "Not set"')"
+    
+    if is_tunnel_running "$p" "$method"; then
+        echo -e "\n${GREEN}✅ ${method^} Tunnel Running${NC}"
+        local url=$(echo "$data" | jq -r ".tunnel_url_${method} // \"\"")
+        if [ "$url" != "null" ] && [ -n "$url" ]; then
+            echo -e "${BLUE}URL:${NC} ${CYAN}$url${NC}"
+        fi
+    else
+        echo -e "\n${RED}❌ ${method^} Tunnel Stopped${NC}"
+    fi
+    
+    echo -ne "\n${PURPLE}Press Enter...${NC}"
+    read -r
+}
+
+# ---------- Status All ----------
 status_all() {
     banner
     echo -e "${YELLOW}📊 Status All Profiles${NC}\n"
@@ -204,7 +234,6 @@ status_all() {
     if [ -z "$profiles" ]; then
         echo -e "${RED}No profiles found!${NC}"
     else
-        # Print header
         printf "${PURPLE}%-20s %-8s %-12s %-12s %-10s${NC}\n" "Profile" "Port" "Bot" "Webhook" "Status"
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         
@@ -224,7 +253,6 @@ status_all() {
             is_tunnel_running "$p" "bot" && bot_status="🟢"
             is_tunnel_running "$p" "webhook" && webhook_status="🟢"
             
-            # Combine configured + running status
             local bot_display="${bot_status}"
             [ -n "$bot_configured" ] && bot_display="${bot_status}(${bot_configured})"
             
@@ -234,7 +262,6 @@ status_all() {
             local overall="Idle"
             is_tunnel_running "$p" "bot" || is_tunnel_running "$p" "webhook" && overall="🟢 Active"
             
-            # Print each line properly with colors
             echo -ne "${CYAN}$(printf '%-20s' "$p")${NC} "
             echo -ne "$(printf '%-8s' "$port") "
             echo -ne "$(printf '%-12s' "$bot_display") "
@@ -248,7 +275,7 @@ status_all() {
     read -r
 }
 
-# ---------- NEW: Restart All ----------
+# ---------- Restart All ----------
 restart_all() {
     banner
     echo -e "${YELLOW}🔄 Restart All Tunnels${NC}\n"
@@ -271,25 +298,21 @@ restart_all() {
         local user_id=$(echo "$db" | jq -r ".profiles.\"$p\".user_id")
         local webhook=$(echo "$db" | jq -r ".profiles.\"$p\".webhook")
         
-        # Stop existing tunnels for this profile
         is_tunnel_running "$p" "bot" && stop_tunnel_tmux "$p" "bot"
         is_tunnel_running "$p" "webhook" && stop_tunnel_tmux "$p" "webhook"
         
         sleep 1
         
-        # Restart Bot tunnel if configured
         if [ "$user_id" != "null" ] && [ "$port" != "null" ] && [ -n "$port" ]; then
             echo -e "${GREEN}🔄 Restarting Bot tunnel for: ${CYAN}$p${NC}"
             start_tunnel_tmux "$p" "$port" "bot" "$user_id" "" > /dev/null 2>&1
         fi
         
-        # Restart Webhook tunnel if configured
         if [ "$webhook" != "null" ] && [ "$port" != "null" ] && [ -n "$port" ]; then
             echo -e "${GREEN}🔄 Restarting Webhook tunnel for: ${CYAN}$p${NC}"
             start_tunnel_tmux "$p" "$port" "webhook" "" "$webhook" > /dev/null 2>&1
         fi
         
-        # Skip if neither configured
         if [ "$user_id" = "null" ] && [ "$webhook" = "null" ]; then
             echo -e "${YELLOW}⏭️  Skipping ${CYAN}$p${NC} - No method configured"
         elif [ "$port" = "null" ] || [ -z "$port" ]; then
@@ -301,7 +324,7 @@ restart_all() {
     sleep 2
 }
 
-# ---------- NEW: Stop All ----------
+# ---------- Stop All ----------
 stop_all() {
     banner
     echo -e "${YELLOW}🛑 Stop All Tunnels${NC}\n"
@@ -329,7 +352,7 @@ stop_all() {
     sleep 2
 }
 
-# ---------- Main Menu (Updated) ----------
+# ---------- Main Menu ----------
 main_menu() {
     while true; do
         banner
@@ -504,10 +527,11 @@ bot_method() {
         echo -e "${GREEN}[2]${NC} Change Discord ID"
         echo -e "${GREEN}[3]${NC} Choose port to forward"
         echo -e "${GREEN}[4]${NC} Change Port"
-        echo -e "${GREEN}[5]${NC} Start Tunnel"
-        echo -e "${GREEN}[6]${NC} Stop Tunnel"
-        echo -e "${GREEN}[7]${NC} Clear Bot Data"
-        echo -e "${RED}[8]${NC} Back\n"
+        echo -e "${GREEN}[5]${NC} Show Data"
+        echo -e "${GREEN}[6]${NC} Start Tunnel"
+        echo -e "${GREEN}[7]${NC} Stop Tunnel"
+        echo -e "${GREEN}[8]${NC} Clear Bot Data"
+        echo -e "${RED}[9]${NC} Back\n"
         echo -ne "${PURPLE}Choice: ${NC}"
         read -r choice
         
@@ -516,21 +540,22 @@ bot_method() {
             2) set_discord_id "$p" ;;
             3) set_port "$p" ;;
             4) set_port "$p" ;;
-            5)
+            5) show_method_data "$p" "bot" ;;
+            6)
                 if is_tunnel_running "$p" "bot"; then
                     echo -e "\n${YELLOW}⚠️  Bot tunnel already running!${NC}"; sleep 2
                 else
                     start_bot_tunnel "$p"
                 fi
                 ;;
-            6) stop_tunnel_tmux "$p" "bot" ;;
-            7)
+            7) stop_tunnel_tmux "$p" "bot" ;;
+            8)
                 echo -ne "\n${RED}Clear bot data? (y/n): ${NC}"
                 read -r confirm
                 [ "$confirm" = "y" ] && { local db=$(load_db); db=$(echo "$db" | jq ".profiles.\"$p\".user_id = null"); save_db "$db"; echo -e "\n${GREEN}✅ Cleared!${NC}"; }
                 sleep 1
                 ;;
-            8) return ;;
+            9) return ;;
             *) echo -e "\n${RED}Invalid!${NC}"; sleep 1 ;;
         esac
     done
@@ -550,10 +575,11 @@ webhook_method() {
         echo -e "${GREEN}[2]${NC} Change Webhook"
         echo -e "${GREEN}[3]${NC} Choose port to forward"
         echo -e "${GREEN}[4]${NC} Change Port"
-        echo -e "${GREEN}[5]${NC} Start Tunnel"
-        echo -e "${GREEN}[6]${NC} Stop Tunnel"
-        echo -e "${GREEN}[7]${NC} Clear Webhook Data"
-        echo -e "${RED}[8]${NC} Back\n"
+        echo -e "${GREEN}[5]${NC} Show Data"
+        echo -e "${GREEN}[6]${NC} Start Tunnel"
+        echo -e "${GREEN}[7]${NC} Stop Tunnel"
+        echo -e "${GREEN}[8]${NC} Clear Webhook Data"
+        echo -e "${RED}[9]${NC} Back\n"
         echo -ne "${PURPLE}Choice: ${NC}"
         read -r choice
         
@@ -562,21 +588,22 @@ webhook_method() {
             2) set_webhook "$p" ;;
             3) set_port "$p" ;;
             4) set_port "$p" ;;
-            5)
+            5) show_method_data "$p" "webhook" ;;
+            6)
                 if is_tunnel_running "$p" "webhook"; then
                     echo -e "\n${YELLOW}⚠️  Webhook tunnel already running!${NC}"; sleep 2
                 else
                     start_webhook_tunnel "$p"
                 fi
                 ;;
-            6) stop_tunnel_tmux "$p" "webhook" ;;
-            7)
+            7) stop_tunnel_tmux "$p" "webhook" ;;
+            8)
                 echo -ne "\n${RED}Clear webhook data? (y/n): ${NC}"
                 read -r confirm
                 [ "$confirm" = "y" ] && { local db=$(load_db); db=$(echo "$db" | jq ".profiles.\"$p\".webhook = null"); save_db "$db"; echo -e "\n${GREEN}✅ Cleared!${NC}"; }
                 sleep 1
                 ;;
-            8) return ;;
+            9) return ;;
             *) echo -e "\n${RED}Invalid!${NC}"; sleep 1 ;;
         esac
     done
