@@ -54,4 +54,4 @@ Just run it and share instantly 🌍
 ## ⚙️ Example Usage
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ShahedPlayz/instant-ipv4-tunnel/main/instant-ipv4.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/ShahedPlayz/instant-ipv4-tunnel/main/instant-ipv4.sh | tr -d '\r')
