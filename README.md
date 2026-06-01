@@ -12,7 +12,7 @@ With just one command, you can turn your **localhost** into a **publicly accessi
 
 No VPS setup Needed,  
 No complicated networking Needed , 
-No long configurations Needed.  
+No long configurations Needed,  
 
 Just run it and share instantly 🌍
 
