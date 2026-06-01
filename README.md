@@ -49,6 +49,9 @@ Just run it and share instantly 🌍
 3️⃣ You get a public IPv4 link 🌍  
 4️⃣ Share it anywhere instantly 🔥  
 
+## 🌌 Gallery
+![Demo](sgm-bypasser.png)
+
 ---
 
 ## ⚙️ Usage CMD
