@@ -51,7 +51,7 @@ Just run it and share instantly 🌍
 
 ---
 
-## ⚙️ Example Usage
+## ⚙️ Usage CMD
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/ShahedPlayz/instant-ipv4-tunnel/main/instant-ipv4.sh | tr -d '\r')
