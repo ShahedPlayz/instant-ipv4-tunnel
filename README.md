@@ -10,9 +10,9 @@
 
 With just one command, you can turn your **localhost** into a **publicly accessible URL** in seconds.
 
-No VPS setup ❌  
-No complicated networking ❌  
-No long configurations ❌  
+No VPS setup Needed,  
+No complicated networking Needed , 
+No long configurations Needed.  
 
 Just run it and share instantly 🌍
 
